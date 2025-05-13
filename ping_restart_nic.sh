@@ -10,8 +10,16 @@ eth_card='eth0'
 log_file='/var/log/ping_restart_nic.log'
 count_file='/var/log/ping_eth_restart.count'
 
-function date_time() {
-    date "+%Y/%m/%d %H:%M:%S"
+retry_max=10
+
+log_w() {
+    echo "[$(date '+%Y/%m/%d %H:%M:%S')] $*" >> $log_file
+}
+
+count_0() {
+  if ((count != 0)); then
+    echo -n 0 > $count_file
+  fi
 }
 
 # gateway test
@@ -19,7 +27,7 @@ ping -c 5 $gateway &> /dev/null
 if [ $? -ne 0 ]; then
   ping -c 5 $gateway &> /dev/null
   if [ $? -ne 0 ]; then
-    echo "[`date_time`] 网关无法连接" >> $log_file
+    log_w "网关无法连接"
     exit
   fi
 fi
@@ -41,13 +49,13 @@ if [ $? -ne 0 ]; then
 
     ping -c 5 119.29.29.29 &> /dev/null
     if [ $? -ne 0 ]; then
-      count=`expr $count + 1`
+      ((count++))
       echo -n $count > $count_file
 
-      if [ $count -gt 5 ]; then
-        echo "[`date_time`] IPV4 外网依旧无法连接，不再重启网卡" >> $log_file
+      if [ $count -gt $retry_max ]; then
+        log_w "IPV4 外网依旧无法连接，不再重启网卡"
       else
-        echo "[`date_time`] IPV4 外网无法连接，重启网卡" >> $log_file
+        log_w "IPV4 外网无法连接，重启网卡"
         ip link set $eth_card down; sleep 15; ip link set $eth_card up
       fi
 
@@ -55,7 +63,7 @@ if [ $? -ne 0 ]; then
     fi
   fi
 else
-  echo -n 0 > $count_file
+  count_0
 fi
 
 
@@ -68,13 +76,13 @@ if [ $? -ne 0 ]; then
 
     ping -6 -c 3 www.zhihu.com.ipv6.dsa.dnsv1.com &> /dev/null
     if [ $? -ne 0 ]; then
-      count=`expr $count + 1`
+      ((count++))
       echo -n $count > $count_file
 
-      if [ $count -gt 5 ]; then
-        echo "[`date_time`] IPV6 外网依旧无法连接，不再重启网卡" >> $log_file
+      if [ $count -gt $retry_max ]; then
+        log_w "IPV6 外网依旧无法连接，不再重启网卡"
       else
-        echo "[`date_time`] IPV6 外网无法连接，重启网卡" >> $log_file
+        log_w "IPV6 外网无法连接，重启网卡"
         ip link set $eth_card down; sleep 15; ip link set $eth_card up
       fi
 
@@ -82,5 +90,5 @@ if [ $? -ne 0 ]; then
     fi
   fi
 else
-  echo -n 0 > $count_file
+  count_0
 fi
