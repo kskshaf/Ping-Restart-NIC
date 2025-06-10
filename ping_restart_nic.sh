@@ -2,7 +2,7 @@
 set -o nounset
 set -o pipefail
 
-# crontab: */5 * * * *
+# crontab: */5 * * * *   flock -xn /path/to/ping_restart_nic.lock -c "bash /path/to/ping_restart_nic.sh"
 
 gateway='192.168.0.1'
 eth_card='eth0'
@@ -22,12 +22,20 @@ count_0() {
   fi
 }
 
+restart_eth() {
+  ip link set $eth_card down
+  sleep 15
+  ip link set $eth_card up
+}
+
 # gateway test
 ping -c 5 $gateway &> /dev/null
 if [ $? -ne 0 ]; then
+  sleep 200
   ping -c 5 $gateway &> /dev/null
   if [ $? -ne 0 ]; then
-    log_w "网关无法连接"
+    log_w "网关无法连接，尝试重启网卡"
+    restart_eth
     exit
   fi
 fi
@@ -56,7 +64,7 @@ if [ $? -ne 0 ]; then
         log_w "IPV4 外网依旧无法连接，不再重启网卡"
       else
         log_w "IPV4 外网无法连接，重启网卡"
-        ip link set $eth_card down; sleep 15; ip link set $eth_card up
+        restart_eth
       fi
 
       exit
@@ -83,7 +91,7 @@ if [ $? -ne 0 ]; then
         log_w "IPV6 外网依旧无法连接，不再重启网卡"
       else
         log_w "IPV6 外网无法连接，重启网卡"
-        ip link set $eth_card down; sleep 15; ip link set $eth_card up
+        restart_eth
       fi
 
       exit
